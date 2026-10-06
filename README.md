@@ -44,7 +44,7 @@ Both **English** and **Persian** keyboards must be installed in Windows
 (Settings → Time & language → Language & region).
 
 ### 2. Just type
-Type normally in any program — Word, Chrome, WhatsApp, Notepad… Each time you press <kbd>Space</kbd>, ZabanYar checks the word you just typed:
+Type normally in any program — Word, Chrome, WhatsApp, Telegram, Notepad… Each time you press <kbd>Space</kbd> — or simply stop typing for a second, e.g. in a search box — ZabanYar checks the word you just typed:
 
 - **When it is sure** the word was typed with the wrong keyboard, it replaces the word automatically and switches the keyboard language for you, so you can keep typing.
 - **When it is not sure**, a small bubble appears next to your text: *«منظورتون این بود؟»* (*Did you mean?*) with the suggested word.
@@ -57,14 +57,15 @@ If ZabanYar didn't catch a word, press the **hotkey** (<kbd>Pause</kbd> by defau
 The last word (and anything typed after it) is converted to the other language.
 Laptop without a <kbd>Pause</kbd> key? Choose <kbd>F8</kbd>, <kbd>F9</kbd> or <kbd>F10</kbd> in the tray menu → **Hotkey**.
 
-### 4. Start automatically
-Right-click the tray icon → **Start with Windows**.
+### 4. Starts with Windows
+ZabanYar starts automatically every time you turn on your computer.
+To stop that, right-click the tray icon and untick **Start with Windows**.
 
 ### 5. Turn it off or close it
 Right-click the tray icon → **Off (hotkey only)** to pause automatic fixing, or **Exit** to close it.
 
 ### Good to know
-- Automatic fixing happens only on <kbd>Space</kbd> — never on <kbd>Enter</kbd>, so a chat message is never changed after it's sent.
+- Fixing happens on <kbd>Space</kbd> or after a short pause — never on <kbd>Enter</kbd>, so a chat message is never changed after it's sent.
 - Clicking somewhere else or switching windows makes ZabanYar forget what you typed.
 - It doesn't work inside programs that run *as administrator*, unless you also run ZabanYar as administrator (right-click → **Run as administrator**).
 
@@ -77,7 +78,7 @@ Right-click the tray icon → **Off (hotkey only)** to pause automatic fixing, o
 | **Off (hotkey only)** | Only the manual hotkey works |
 | **Hotkey** | Pause / F8 / F9 / F10 / Scroll Lock / Insert |
 | **Switch keyboard language after fixing** | Also changes the active keyboard |
-| **Start with Windows** | Run automatically at login |
+| **Start with Windows** | Run automatically at login (on by default) |
 
 Settings are saved in `%APPDATA%\ZabanYar\config.json`; errors (if any) in `error.log` next to it.
 
@@ -131,7 +132,7 @@ Every push is built automatically by GitHub Actions; pushing a tag like `v1.1` p
 دقت کنید هر دو کیبورد فارسی و انگلیسی در تنظیمات زبان ویندوز نصب باشند.
 
 ### ۲. فقط تایپ کنید
-در هر برنامه‌ای مثل ورد، کروم یا واتس‌اپ عادی تایپ کنید. هر بار که کلید فاصله را می‌زنید، زبان‌یار کلمهٔ قبلی را بررسی می‌کند:
+در هر برنامه‌ای مثل ورد، کروم، واتس‌اپ یا تلگرام عادی تایپ کنید. هر بار که کلید فاصله را می‌زنید، یا وقتی یک لحظه تایپ را متوقف می‌کنید (مثلاً در کادر جستجو)، زبان‌یار کلمهٔ قبلی را بررسی می‌کند:
 
 - **اگر مطمئن باشد** کلمه با زبان اشتباه تایپ شده، خودش آن را درست می‌کند و زبان کیبورد را هم عوض می‌کند تا بقیه را درست تایپ کنید.
 - **اگر مطمئن نباشد**، یک حباب کوچک کنار متن باز می‌شود و می‌پرسد «منظورتون این بود؟» و کلمهٔ پیشنهادی را نشان می‌دهد.
@@ -145,7 +146,8 @@ Every push is built automatically by GitHub Actions; pushing a tag like `v1.1` p
 اگر لپ‌تاپتان این کلید را ندارد، روی آیکون راست‌کلیک کنید و از منوی کلید میانبر یکی دیگر را انتخاب کنید (Hotkey → F8 / F9 / F10).
 
 ### ۴. اجرای خودکار با روشن شدن ویندوز
-روی آیکون راست‌کلیک کنید و این گزینه را بزنید (Start with Windows).
+زبان‌یار هر بار که کامپیوتر را روشن می‌کنید خودش اجرا می‌شود.
+اگر این را نمی‌خواهید، روی آیکون راست‌کلیک کنید و تیک این گزینه را بردارید (Start with Windows).
 
 ### ۵. تنظیمات منوی آیکون
 روی آیکون کنار ساعت راست‌کلیک کنید. گزینه‌ها:
@@ -157,12 +159,12 @@ Every push is built automatically by GitHub Actions; pushing a tag like `v1.1` p
 | Off (hotkey only) | تشخیص خودکار خاموش؛ فقط کلید میانبر کار می‌کند |
 | Hotkey | انتخاب کلید میانبر |
 | Switch keyboard language after fixing | بعد از تبدیل، زبان کیبورد هم عوض شود |
-| Start with Windows | اجرای خودکار با ویندوز |
+| Start with Windows | اجرای خودکار با ویندوز (پیش‌فرض روشن) |
 | About | دربارهٔ برنامه |
 | Exit | بستن برنامه |
 
 ### نکته‌ها
-- تبدیل خودکار فقط با کلید فاصله انجام می‌شود، نه با اینتر؛ پس پیامی که فرستاده‌اید عوض نمی‌شود.
+- تبدیل با کلید فاصله یا بعد از یک مکث کوتاه انجام می‌شود، نه با اینتر؛ پس پیامی که فرستاده‌اید عوض نمی‌شود.
 - با کلیک در جای دیگر یا رفتن به پنجرهٔ دیگر، برنامه کلمه‌های قبلی را فراموش می‌کند.
 - در برنامه‌هایی که با دسترسی مدیر اجرا شده‌اند کار نمی‌کند، مگر اینکه زبان‌یار را هم با راست‌کلیک و این گزینه اجرا کنید (Run as administrator).
 - **حریم خصوصی:** برنامه هیچ چیزی را ذخیره یا به اینترنت ارسال نمی‌کند.

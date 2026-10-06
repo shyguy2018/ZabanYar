@@ -25,7 +25,7 @@ import core
 
 APP_NAME = 'ZabanYar'
 AUTHOR = 'Behrooz Shayestepoor'
-VERSION = '1.1'
+VERSION = '1.2'
 CONFIG_PATH = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')),
                            APP_NAME, 'config.json')
 DEFAULT_CONFIG = {
@@ -35,7 +35,10 @@ DEFAULT_CONFIG = {
     'hotkey': 'pause',      # pause | f9 | f10 | scroll | insert
     'bubble_seconds': 7,
     'switch_layout': True,  # also switch the keyboard language after fixing
+    'autostart': True,      # start automatically when Windows starts
+    'idle_check': True,     # also check a word when you stop typing (search boxes)
 }
+IDLE_MS = 1100              # pause after which an unfinished word is checked
 HOTKEYS = {'pause': 0x13, 'f8': 0x77, 'f9': 0x78, 'f10': 0x79, 'scroll': 0x91, 'insert': 0x2D}
 
 # ------------------------------------------------------------------ win32 ---
@@ -260,11 +263,23 @@ class Tracker:
         self.layouts = installed_layouts()
         self.enabled = True
         self.hotkey_vk = 0x13
+        self.seq = 0                  # increases with every typed key
+        self.pending = None           # (lang, hwnd, until): layout we just switched to
+        self.bubble_rect = None       # screen rect of the bubble (set by the UI)
 
     def reset(self):
+        # Clear right here in the hook thread. (Clearing later in the UI thread
+        # used to wipe the first letter typed in a newly focused window.)
         with self.lock:
             self.run = []
+            self.seq += 1
         self.events.put(('reset',))
+
+    def on_click(self, x, y):
+        r = self.bubble_rect
+        if r and r[0] <= x <= r[2] and r[1] <= y <= r[3]:
+            return                    # click on our own bubble: keep the text
+        self.reset()
 
     # called from the hook thread
     def on_key(self, vk, scan):
@@ -285,14 +300,25 @@ class Tracker:
             return False
         hkl = user32.GetKeyboardLayout(tid)
         lang = lang_of(hkl)
+        # right after we switch the keyboard language the app may not have
+        # applied it yet - the first letter of the next word would otherwise
+        # be recorded in the old language
+        p = self.pending
+        if p:
+            if lang == p[0] or hwnd != p[1] or time.time() > p[2]:
+                self.pending = None
+            else:
+                lang = p[0]
         if vk == VK_BACK:
             with self.lock:
                 if self.run:
                     self.run.pop()
+                self.seq += 1
             return False
         if vk == VK_SPACE:
             with self.lock:
                 self.run.append(Key(' ', ' ', lang))
+                self.seq += 1
                 snapshot = list(self.run)
             self.events.put(('space', snapshot))
             return False
@@ -320,7 +346,9 @@ class Tracker:
             self.run.append(Key(en, fa, lang))
             if len(self.run) > 400:
                 self.run = self.run[-200:]
-        self.events.put(('typed',))
+            self.seq += 1
+            seq = self.seq
+        self.events.put(('typed', seq))
         return False
 
     # ---- helpers used by the UI thread
@@ -353,6 +381,7 @@ class Tracker:
             hkl = self.layouts.get(target_lang)
             if hkl:
                 hwnd, _ = foreground()
+                self.pending = (target_lang, hwnd, time.time() + 2.0)
                 user32.PostMessageW(hwnd, WM_INPUTLANGCHANGEREQUEST, 0, hkl)
         return new_text
 
@@ -380,7 +409,10 @@ class Hooks(threading.Thread):
         def mouse(n, wparam, lparam):
             if n == 0 and wparam in (WM_LBUTTONDOWN, WM_RBUTTONDOWN):
                 m = ctypes.cast(lparam, ctypes.POINTER(MSLLHOOKSTRUCT)).contents
-                self.tracker.events.put(('click', m.pt.x, m.pt.y))
+                try:
+                    self.tracker.on_click(m.pt.x, m.pt.y)
+                except Exception:
+                    pass
             return user32.CallNextHookEx(None, n, wparam, lparam)
 
         self._kb = HOOKPROC(kb)          # keep references alive
@@ -449,7 +481,10 @@ class Bubble:
         except Exception:
             pass
         self.win = w
-        self.app.tracker.events.put(('bubble_shown',))
+        w.update_idletasks()
+        self.app.tracker.bubble_rect = (w.winfo_rootx(), w.winfo_rooty(),
+                                        w.winfo_rootx() + w.winfo_width(),
+                                        w.winfo_rooty() + w.winfo_height())
         self.hide_job = root.after(int(self.app.cfg['bubble_seconds'] * 1000), self.hide)
 
     def contains(self, x, y):
@@ -476,6 +511,7 @@ class Bubble:
             except Exception:
                 pass
             self.hide_job = None
+        self.app.tracker.bubble_rect = None
         if self.win is not None:
             self.win.destroy()
             self.win = None
@@ -512,14 +548,14 @@ class App:
 
     def handle(self, ev):
         kind = ev[0]
-        if kind == 'reset' or kind == 'click':
-            if kind == 'click' and self.bubble.contains(ev[1], ev[2]):
-                return                       # click on our own bubble
-            # a click elsewhere moves the text cursor - forget the typed text
+        if kind == 'reset':
+            # focus change / click / arrows: the tracker already forgot the text
             self.bubble.hide()
             self.last_fix = None
-            with self.tracker.lock:
-                self.tracker.run = []
+        elif kind == 'typed':
+            if self.cfg.get('idle_check', True) and self.cfg['mode'] != 'off':
+                seq = ev[1]
+                self.root.after(IDLE_MS, lambda: self.on_idle(seq))
         elif kind == 'escape':
             self.bubble.hide()
         elif kind == 'hotkey':
@@ -568,6 +604,39 @@ class App:
             tail = self.tracker.run[start:]
         wrong = typed
         preview = ''.join(k.text(target_lang) if k.lang == wrong else k.text() for k in tail).strip()
+        if target_lang == LANG_FA:
+            preview = core.normalize_fa(preview)
+        self.bubble.show(preview, start, target_lang)
+
+    def on_idle(self, seq):
+        """The user stopped typing in the middle of a word (no Space yet) -
+        typical for search boxes (Telegram, Windows search, browsers)."""
+        if seq != self.tracker.seq or self.bubble.visible():
+            return
+        with self.tracker.lock:
+            run = list(self.tracker.run)
+        if not run or run[-1].en == ' ':
+            return
+        start, end = Tracker.last_word_span(run, skip_trailing_space=False)
+        word = run[start:end]
+        if len(word) < 2 or len({k.lang for k in word}) != 1:
+            return
+        typed = word[0].lang
+        en_str = ''.join(k.en for k in word)
+        fa_str = ''.join(k.fa for k in word)
+        ctx = self.last_fix[0] if self.last_fix and time.time() - self.last_fix[1] < 30 else None
+        verdict, repl, target = core.decide(en_str, fa_str, 'en' if typed == LANG_EN else 'fa', ctx)
+        if not verdict:
+            return
+        target_lang = LANG_FA if target == 'fa' else LANG_EN
+        if verdict == 'auto' and self.cfg['mode'] == 'smart':
+            with self.tracker.lock:
+                still = self.tracker.seq == seq
+            if still:
+                self.last_fix = (target, time.time())
+                self.tracker.convert_from(start, target_lang, self.cfg['switch_layout'])
+            return
+        preview = ''.join(k.text(target_lang) for k in word)
         if target_lang == LANG_FA:
             preview = core.normalize_fa(preview)
         self.bubble.show(preview, start, target_lang)
@@ -621,7 +690,10 @@ class App:
             save_config(self.cfg)
 
         def toggle_startup(icon, item):
-            set_startup(not startup_enabled())
+            on = not startup_enabled()
+            set_startup(on)
+            self.cfg['autostart'] = on
+            save_config(self.cfg)
 
         def quit_app(icon, item):
             icon.stop()
@@ -680,7 +752,19 @@ class App:
         w.bind('<Button-1>', lambda e: w.destroy())
         self.root.after(5000, w.destroy)
 
+    def apply_autostart(self):
+        """Start with Windows by default; keep the saved path up to date
+        (e.g. if ZabanYar.exe was moved to another folder)."""
+        try:
+            if self.cfg.get('autostart', True):
+                set_startup(True)
+            elif startup_enabled():
+                set_startup(False)
+        except Exception:
+            log_error('autostart')
+
     def run(self):
+        self.apply_autostart()
         self.root.after(300, self.welcome)
         self.root.mainloop()
 
